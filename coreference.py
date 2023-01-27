@@ -4,7 +4,7 @@ import tokenizations
 import transformers
 
 from tags import get_tag_replacers, match_replacers_with_nps, filter_words_from_span, _merge_that_with_nearest_np, _remove_how_about
-from const import TAGS_REGEXP, DEPENDENT_PHRASE_REGEXP, F_DEPENDENT_PHRASE_REGEXP, NON_F_DEPENDENT_PHRASE_REGEXP, GROUP_NPS, EXISTENCE_NPS, THINGS
+from const import TAGS_REGEXP, DEPENDENT_PHRASE_REGEXP, F_DEPENDENT_PHRASE_REGEXP, NON_F_DEPENDENT_PHRASE_REGEXP, GROUP_NPS, EXISTENCE_NPS, THINGS, UNIQUE_NPS
 
 nlp = spacy.load("en_core_web_sm")
 tokenizer = transformers.BertTokenizer.from_pretrained("bert-base-uncased")
@@ -21,7 +21,6 @@ def resolve_caption(replaced_nps, objects_ids, template_info, i):
                 'round': i
             })
         non_focus_ids = objects_ids[1:]
-        focus_id = objects_ids[0] if objects_ids else None
     if len(replaced_nps) == 1 and 'count' in template_info['label']:
         focus_id = '-'.join(map(str, objects_ids)) if len(objects_ids) > 1 else objects_ids[0]
         groupped[focus_id].append({
@@ -29,6 +28,37 @@ def resolve_caption(replaced_nps, objects_ids, template_info, i):
             'round': i
         })
     return groupped, focus_id, non_focus_ids
+
+
+def resolve_unique_caption(processed_text, objects_ids, i):
+    groupped = defaultdict(list)
+    focus_id = None
+    non_focus_ids = None
+    for np in UNIQUE_NPS:
+        if np in processed_text.text.lower():
+            start = processed_text.text.lower().find(np)
+            focus_id = objects_ids[0] if objects_ids else None
+            groupped[focus_id].append({
+                'np': processed_text.char_span(start, start + len(np)), 'round': i
+            })
+            return groupped, focus_id, non_focus_ids
+    return groupped, focus_id, non_focus_ids
+
+def resolve_caption_things(template_info, dialog, objects_ids, things, focus_id, i):
+    groupped = defaultdict(list)
+    if 'extreme' in template_info['label']:
+        if template_info['index'] == 2 or template_info['index'] == 3:
+            dialog_objects = list(map(int, dialog['graph']['objects'].keys()))
+            if focus_id in dialog_objects:
+                dialog_objects.remove(focus_id)
+            focus_id = '-'.join(map(str, dialog_objects)) if len(dialog_objects) > 1 else dialog_objects[0]
+    if focus_id is None:
+        focus_id = '-'.join(map(str, objects_ids)) if len(objects_ids) > 1 else objects_ids[0]
+    groupped[focus_id].append({
+        'np': things[0],
+        'round': i
+    })
+    return groupped, focus_id
 
 
 def resolve_non_focus(dialog, replaced_nps, objects_ids, template_info, i, dependence, round_focus_ids,
@@ -111,24 +141,19 @@ def group_nps_by_referents(dialog):
         non_focus_id = None
         # caption
         if i == 0:
-            caption_groupped, focus_id, non_focus_id = resolve_caption(replaced_nps, objects_ids, template_info, i)
-            round_non_focus_ids.append(non_focus_id)
+            if 'unique' in template_info['label'] and template_info.get('index', -1) == 2:
+                caption_groupped, focus_id, non_focus_id = resolve_unique_caption(processed_text, objects_ids, i)
+            else:
+                caption_groupped, focus_id, non_focus_id = resolve_caption(replaced_nps, objects_ids, template_info, i)
             for g, nps in caption_groupped.items():
                 groupped[g].extend(nps)
+
             if len(things) == 1:
-                if 'extreme' in template_info['label']:
-                    if template_info['index'] == 2 or template_info['index'] == 3:
-                        dialog_objects = list(map(int, dialog['graph']['objects'].keys()))
-                        if focus_id in dialog_objects:
-                            dialog_objects.remove(focus_id)
-                        focus_id = '-'.join(map(str, dialog_objects)) if len(dialog_objects) > 1 else dialog_objects[0]
-                if focus_id is None:
-                    focus_id = '-'.join(map(str, objects_ids)) if len(objects_ids) > 1 else objects_ids[0]
-                groupped[focus_id].append({
-                    'np': things[0],
-                    'round': i
-                })
+                things_groupped, non_focus_id = resolve_caption_things(template_info, dialog, objects_ids, things, focus_id, i)
+                for g, nps in things_groupped.items():
+                    groupped[g].extend(nps)
             round_focus_ids.append(focus_id)
+            round_non_focus_ids.append(non_focus_id)
             continue
 
         if focus_id is None:

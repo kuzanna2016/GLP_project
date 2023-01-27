@@ -31,3 +31,8 @@ EXISTENCE_NPS = (
     'things',
     'objects',
 )
+
+UNIQUE_NPS = (
+    'exactly one',
+    'one'
+)

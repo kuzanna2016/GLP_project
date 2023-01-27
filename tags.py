@@ -13,12 +13,12 @@ from const import (
 nlp = spacy.load("en_core_web_sm")
 tokenizer = transformers.BertTokenizer.from_pretrained("bert-base-uncased")
 
-meta_info = json.load(open(f'ContextVD/data_construction/templates/metainfo.json'))
-synonyms = json.load(open(f'ContextVD/data_construction/templates/synonyms.json'))
+meta_info = json.load(open(f'../ContextVD/data_construction/templates/metainfo.json'))
+synonyms = json.load(open(f'../ContextVD/data_construction/templates/synonyms.json'))
 
 question_templates = []
-for f in os.listdir('ContextVD/data_construction/templates/questions'):
-    t = json.load(open(f'ContextVD/data_construction/templates/questions/{f}'))
+for f in os.listdir('../ContextVD/data_construction/templates/questions'):
+    t = json.load(open(f'../ContextVD/data_construction/templates/questions/{f}'))
     question_templates.extend(t)
 question_templates = {t['label']: t for t in question_templates}
 

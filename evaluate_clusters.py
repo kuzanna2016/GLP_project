@@ -137,7 +137,7 @@ def main(clevr_path, clusters_gold_path, save_pred=None, count_solo=False, gold_
 
 if __name__ == '__main__':
     main(clevr_path='clevr/clevr_val_random_75_dialogs.json',
-         clusters_gold_path='clevr/clevr_val_random_75_dialogs_tokens_annotated_clusters_revised.json',
+         clusters_gold_path='clevr/clevr_val_random_75_dialogs_annotated_clusters_revised.json',
          gold_aligned=True
          # save_pred='clevr/clevr_val_random_75_dialogs_tokens_annotated_clusters_predicted.json'
          )
