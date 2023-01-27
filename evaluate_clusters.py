@@ -111,7 +111,7 @@ def main(clevr_path, clusters_gold_path, save_pred=None, count_solo=False, gold_
     d = difflib.Differ()
     score = 0
     tp_all, fp_all, fn_all = 0, 0, 0
-    for n_case, case in enumerate(clevr_annotated_clusters):
+    for n_case, case in enumerate(clevr_annotated_clusters[25:]):
         i, j = case['i'], case['j']
         if gold_aligned:
             dialog = clevr[n_case]
@@ -136,10 +136,11 @@ def main(clevr_path, clusters_gold_path, save_pred=None, count_solo=False, gold_
 
 
 if __name__ == '__main__':
-    main(clevr_path='clevr/clevr_val_random_75_dialogs.json',
-         clusters_gold_path='clevr/clevr_val_random_75_dialogs_annotated_clusters_revised.json',
-         gold_aligned=True
-         # save_pred='clevr/clevr_val_random_75_dialogs_tokens_annotated_clusters_predicted.json'
-         )
-    # main(clevr_path='clevr/clevr_val_with_coref_0_4.json',
-    #      clusters_gold_path='clevr/clevr_val_with_coref_0_4_annotated.json')
+    # main(clevr_path='clevr/clevr_val_random_75_dialogs.json',
+    #      clusters_gold_path='clevr/clevr_val_random_75_dialogs_annotated_clusters_revised.json',
+    #      gold_aligned=True
+    #      # save_pred='clevr/clevr_val_random_75_dialogs_tokens_annotated_clusters_predicted.json'
+    #      )
+    main(clevr_path='clevr/clevr_val_raw_0_999.json',
+         clusters_gold_path='clevr/clevr_val_0_4_100_110_annotated_clusters.json',
+         save_pred='clevr/clevr_val_100_110_predicted_clusters.json')
