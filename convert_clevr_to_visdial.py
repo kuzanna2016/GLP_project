@@ -49,7 +49,7 @@ def main(clevr_path, save_path, mix_dialogs=3):
                 })
             clusters = extract_clusters(dialog)
             if mix_dialogs > 0:
-                ixs = random.choices(range(len(new_rounds)), k=mix_dialogs)
+                ixs = random.choices(range(len(new_rounds) - 1), k=mix_dialogs)
                 ixs += [len(new_rounds)]
                 new_dialogs = [
                     {
@@ -85,5 +85,5 @@ def main(clevr_path, save_path, mix_dialogs=3):
 
 if __name__ == '__main__':
     main(clevr_path='clevr/CLEVR_VD_VAL.json',
-         save_path='clevr/CLEVR_VD_VAL_VISDIAL_1000_pictures_full_dialogs.json',
-         mix_dialogs=0)
+         save_path='clevr/CLEVR_VD_VAL_VISDIAL_1000_pictures_mixed_dialog_length.json',
+         mix_dialogs=3)

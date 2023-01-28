@@ -43,8 +43,12 @@ wget https://dl.fbaipublicfiles.com/clevr/CLEVR_v1.0.zip -O disk/clevr
 vim config/vonly.conf
 
 # run Phase 1
+GPU=0 python main.py --model joint/MB-JC --mode predict
 GPU=0 python main.py --model vonly/MB-JC_predict --mode predict
 GPU=0 python main.py --model conly/MB-JC_predict --mode predict
+GPU=0 python main.py --model conly/MB-JC_eval --mode eval
+GPU=0 python main.py --model conly/MB-JC_eval --mode predict
+GPU=0 python main.py --model vonly/MB-JC_predict --mode predict
 
 python postprocessing/merge_predictions.py --mode phase1 --model MB-JC_predict
 
@@ -62,6 +66,7 @@ scp -P 60121 disi@ml-lab-2a8eaddc-f375-4ce9-914c-c69e61f6f4ec.westeurope.cloudap
 # to copy file from local t0 server run
 scp -P 60121 clevr/CLEVR_VD_VAL_VISDIAL_1_dialog_per_1000_pictures.json disi@ml-lab-2a8eaddc-f375-4ce9-914c-c69e61f6f4ec.westeurope.cloudapp.azure.com:~/disk/datasets/clevr
 ../disk/datasets/
+
 # vilbert install
 inspo from https://naserian-elahe.medium.com/vilbert-a-model-for-learning-joint-representations-of-image-content-and-natural-language-47f56a313a79
 wget https://github.com/conda-forge/miniforge/releases/latest/download/Mambaforge-Linux-x86_64.sh
@@ -92,29 +97,8 @@ cd data
 wget https://dl.fbaipublicfiles.com/vilbert-multi-task/detectron_model.pth
 wget https://dl.fbaipublicfiles.com/vilbert-multi-task/detectron_config.yaml
 cd ../../vilbert-multi-task
-im.convert('RGB')
 
 python script/extract_features.py --model_file ../disk/data/detectron_model.pth --config_file ../disk/data/detectron_config.yaml --image_dir ../disk/CLEVR_v1.0/images/val --output_folder ../disk/CLEVR_v1.0/image_features
-
 python script/convert_to_lmdb.py --features_dir ../disk/CLEVR_v1.0/image_features_1000 --lmdb_file ../disk/CLEVR_v1.0/image_features_1000.lmdb
 scp -P 60121 disi@ml-lab-2a8eaddc-f375-4ce9-914c-c69e61f6f4ec.westeurope.cloudapp.azure.com:~/disk/CLEVR_v1.0/image_features_1000.lmdb/data.mdb /home/kuzya/Desktop/uni/GLP/clevr/image_features_1000.lmdb
 scp -P 60121 disi@ml-lab-2a8eaddc-f375-4ce9-914c-c69e61f6f4ec.westeurope.cloudapp.azure.com:~/disk/CLEVR_v1.0/image_features_1000.lmdb/lock.mdb /home/kuzya/Desktop/uni/GLP/clevr/image_features_1000.lmdb
-
-# debugging
-from utils.image_features_reader import  ImageFeaturesH5Reader
-ifr = ImageFeaturesH5Reader('../disk/CLEVR_v1.0/image_features_1000.lmdb') 
-ifr['CLEVR_val_013021']
-
-import pickle
-import base64
-image_id = str('CLEVR_val_013021').encode()
-index = ifr._image_ids.index(image_id)
-txn = ifr.env.begin(write=False)
-item = pickle.loads(txn.get(image_id))
-item["features"]
-
-
-
-To uninstall the CUDA Toolkit, run cuda-uninstaller in /usr/local/cuda-11.6/bin
-To uninstall the NVIDIA Driver, run nvidia-uninstall
-Logfile is /var/log/cuda-installer.log
