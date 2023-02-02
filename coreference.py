@@ -3,8 +3,10 @@ import spacy
 import tokenizations
 import transformers
 
-from tags import get_tag_replacers, match_replacers_with_nps, filter_words_from_span, _merge_that_with_nearest_np, _remove_how_about
-from const import TAGS_REGEXP, DEPENDENT_PHRASE_REGEXP, F_DEPENDENT_PHRASE_REGEXP, NON_F_DEPENDENT_PHRASE_REGEXP, GROUP_NPS, EXISTENCE_NPS, THINGS, UNIQUE_NPS
+from tags import get_tag_replacers, match_replacers_with_nps, filter_words_from_span, _merge_that_with_nearest_np, \
+    _remove_how_about
+from const import TAGS_REGEXP, DEPENDENT_PHRASE_REGEXP, F_DEPENDENT_PHRASE_REGEXP, NON_F_DEPENDENT_PHRASE_REGEXP, \
+    GROUP_NPS, EXISTENCE_NPS, THINGS, UNIQUE_NPS
 
 nlp = spacy.load("en_core_web_sm")
 tokenizer = transformers.BertTokenizer.from_pretrained("bert-base-uncased")
@@ -43,6 +45,7 @@ def resolve_unique_caption(processed_text, objects_ids, i):
             })
             return groupped, focus_id, non_focus_ids
     return groupped, focus_id, non_focus_ids
+
 
 def resolve_caption_things(template_info, dialog, objects_ids, things, focus_id, i):
     groupped = defaultdict(list)
@@ -129,6 +132,8 @@ def group_nps_by_referents(dialog):
     groupped = defaultdict(list)
     round_focus_ids = []
     round_non_focus_ids = []
+    round_nps = []
+    round_pronouns = []
     for history in dialog['graph']['history']:
         i = history['round']
         template_info = dialog['template_info'][i]
@@ -136,6 +141,11 @@ def group_nps_by_referents(dialog):
         focus_id = history.get('focus_id')
         objects_ids = [o['id'] for o in history['objects']]
         replaced_nps, question_nps, processed_text = _prepare_nps(dialog, i)
+        if i > 0 and isinstance(dialog['dialog'][i - 1]['answer'], int):
+            round_nps.append(question_nps + [dialog['dialog'][i - 1]['answer']])
+        else:
+            round_nps.append(question_nps)
+        round_pronouns.append([t for t in processed_text if 'PRP' in t.tag_])
         things = [np for np in question_nps if any(w in np.text for w in THINGS) and np not in replaced_nps.values()]
 
         non_focus_id = None
@@ -149,7 +159,8 @@ def group_nps_by_referents(dialog):
                 groupped[g].extend(nps)
 
             if len(things) == 1:
-                things_groupped, non_focus_id = resolve_caption_things(template_info, dialog, objects_ids, things, focus_id, i)
+                things_groupped, non_focus_id = resolve_caption_things(template_info, dialog, objects_ids, things,
+                                                                       focus_id, i)
                 for g, nps in things_groupped.items():
                     groupped[g].extend(nps)
             round_focus_ids.append(focus_id)
@@ -158,9 +169,9 @@ def group_nps_by_referents(dialog):
 
         if focus_id is None:
             non_focus_group, focus_id, non_focus_id = resolve_non_focus(dialog, replaced_nps, objects_ids,
-                                                                         template_info, i, dependence,
-                                                                         round_focus_ids,
-                                                                         round_non_focus_ids)
+                                                                        template_info, i, dependence,
+                                                                        round_focus_ids,
+                                                                        round_non_focus_ids)
 
             if focus_id is not None and len(replaced_nps) == 1:
                 groupped[focus_id].append({'np': list(replaced_nps.values())[0], 'round': i})
@@ -247,7 +258,7 @@ def group_nps_by_referents(dialog):
                 for t in tokens:
                     start = processed_text.text.lower().index(t)
                     end = start + len(t)
-                    group_np = processed_text.char_span(start,end)
+                    group_np = processed_text.char_span(start, end)
                     groupped[non_focus_id].append({
                         'np': group_np,
                         'round': i,
@@ -255,7 +266,7 @@ def group_nps_by_referents(dialog):
                     })
         round_focus_ids.append(focus_id)
         round_non_focus_ids.append(non_focus_id)
-    return groupped
+    return groupped, round_nps, round_pronouns
 
 
 def filter_solo_non_pronoun_nps(groupped_nps):
@@ -363,7 +374,40 @@ def get_aligned_rounds(dialog):
     return rounds
 
 
-def index_clusters(groupped_nps, start_per_round, end_ix, aligned_rounds=[], last_round=-1, tokens=True):
+def index_nps_and_pronouns(round_nps, round_pronouns, start_per_round, end_ix, aligned_rounds, last_round=-1):
+    nps = []
+    pronouns = []
+    if last_round == -1:
+        last_round = len(start_per_round)
+    for r, (r_nps, r_pronouns) in enumerate(zip(round_nps, round_pronouns)):
+        if r > last_round:
+            continue
+        for span in r_nps:
+            if isinstance(span, int):
+                if r == last_round:
+                    continue
+                end = start_per_round[r + 1] - 2 if r < len(start_per_round) - 1 else end_ix - 1
+                start = end - len(str(span)) + 1
+                nps.append([end, start])
+                continue
+            start, end = index_span(span, r, aligned_rounds, start_per_round)
+            nps.append([start, end])
+        for token in r_pronouns:
+            start, end = index_span(token.doc[token.i:token.i+1], r, aligned_rounds, start_per_round)
+            pronouns.append([start, end])
+    return nps, pronouns
+
+
+def index_span(span, r, aligned_rounds, start_per_round):
+    difference = aligned_rounds[r]
+    start = span.start
+    start += difference[start] + start_per_round[r]
+    end = span.end - 1
+    end += difference[end + 1] + start_per_round[r]
+    return start, end
+
+
+def index_clusters(groupped_nps, start_per_round, end_ix, aligned_rounds=[], last_round=-1):
     clusters = []
     if last_round == -1:
         last_round = len(start_per_round)
@@ -381,17 +425,7 @@ def index_clusters(groupped_nps, start_per_round, end_ix, aligned_rounds=[], las
                 start = end - len(span) + 1
                 cluster.append([start, end])
                 continue
-            start = span.start_char
-            end = span.end_char
-            if tokens:
-                difference = aligned_rounds[r]
-                start = span.start
-                start += difference[start]
-                end = span.end - 1
-                end += difference[end + 1]
-
-            start += start_per_round[r]
-            end += start_per_round[r]
+            start, end = index_span(span, r, aligned_rounds, start_per_round)
             cluster.append([start, end])
         if cluster:
             clusters.append(cluster)
@@ -400,21 +434,21 @@ def index_clusters(groupped_nps, start_per_round, end_ix, aligned_rounds=[], las
 
 
 def group_nps_pipline(dialog):
-    groupped_nps = group_nps_by_referents(dialog)
+    groupped_nps, round_nps, round_pronouns = group_nps_by_referents(dialog)
     groupped_nps = filter_right_nps(groupped_nps)
     groupped_nps = filter_solo_non_pronoun_nps(groupped_nps)
     groupped_nps = filter_existence(groupped_nps)
-    return groupped_nps
-
-
-def extract_clusters(dialog):
-    groupped_nps = group_nps_pipline(dialog)
-    start_token_per_round, end_ix, aligned_rounds = prepare_for_indexing(dialog)
-    clusters = index_clusters(groupped_nps, start_token_per_round, end_ix, aligned_rounds)
-    return clusters
+    return groupped_nps, round_nps, round_pronouns
 
 
 def prepare_for_indexing(dialog):
     start_token_per_round, end_ix = count_start_per_round(dialog)
     aligned_rounds = get_aligned_rounds(dialog)
     return start_token_per_round, end_ix, aligned_rounds
+
+
+def extract_clusters(dialog):
+    groupped_nps, round_nps, round_pronouns = group_nps_pipline(dialog)
+    start_token_per_round, end_ix, aligned_rounds = prepare_for_indexing(dialog)
+    clusters = index_clusters(groupped_nps, start_token_per_round, end_ix, aligned_rounds)
+    return clusters
