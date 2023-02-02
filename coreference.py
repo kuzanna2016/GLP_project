@@ -366,7 +366,7 @@ def get_aligned_rounds(dialog):
 def index_clusters(groupped_nps, start_per_round, end_ix, aligned_rounds=[], last_round=-1, tokens=True):
     clusters = []
     if last_round == -1:
-        last_round = len(start_per_round) - 1
+        last_round = len(start_per_round)
     for group, nps in groupped_nps.items():
         cluster = []
         for np in nps:
