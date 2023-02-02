@@ -116,6 +116,6 @@ def main(clevr_path, save_path, mix_dialogs=3):
 
 
 if __name__ == '__main__':
-    main(clevr_path='clevr/clevr_val_raw_0_999.json',
-         save_path='clevr/CLEVR_VD_VAL_VISDIAL_1000_pictures_full_dialogs_1.json',
-         mix_dialogs=-1)
+    main(clevr_path='clevr/CLEVR_VD_VAL.json',
+         save_path='clevr/CLEVR_VD_VAL_VISDIAL_1000_pictures_mix_dialogs.json',
+         mix_dialogs=2)
