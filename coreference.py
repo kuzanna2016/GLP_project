@@ -363,14 +363,20 @@ def get_aligned_rounds(dialog):
     return rounds
 
 
-def index_clusters(groupped_nps, start_per_round, end_ix, aligned_rounds=[], tokens=True):
+def index_clusters(groupped_nps, start_per_round, end_ix, aligned_rounds=[], last_round=-1, tokens=True):
     clusters = []
+    if last_round == -1:
+        last_round = len(start_per_round) - 1
     for group, nps in groupped_nps.items():
         cluster = []
         for np in nps:
             r = np['round']
+            if r > last_round:
+                continue
             span = np['np']
             if np.get('answer', False):
+                if r == last_round:
+                    continue
                 end = start_per_round[r + 1] - 2 if r < len(start_per_round) - 1 else end_ix - 1
                 start = end - len(span) + 1
                 cluster.append([start, end])
@@ -387,16 +393,28 @@ def index_clusters(groupped_nps, start_per_round, end_ix, aligned_rounds=[], tok
             start += start_per_round[r]
             end += start_per_round[r]
             cluster.append([start, end])
-        clusters.append(cluster)
+        if cluster:
+            clusters.append(cluster)
+    clusters = [cluster for cluster in clusters if len(cluster) > 1]
     return clusters
 
 
-def extract_clusters(dialog):
+def group_nps_pipline(dialog):
     groupped_nps = group_nps_by_referents(dialog)
     groupped_nps = filter_right_nps(groupped_nps)
     groupped_nps = filter_solo_non_pronoun_nps(groupped_nps)
     groupped_nps = filter_existence(groupped_nps)
-    start_token_per_round, end_ix = count_start_per_round(dialog)
-    aligned_rounds = get_aligned_rounds(dialog)
+    return groupped_nps
+
+
+def extract_clusters(dialog):
+    groupped_nps = group_nps_pipline(dialog)
+    start_token_per_round, end_ix, aligned_rounds = prepare_for_indexing(dialog)
     clusters = index_clusters(groupped_nps, start_token_per_round, end_ix, aligned_rounds)
     return clusters
+
+
+def prepare_for_indexing(dialog):
+    start_token_per_round, end_ix = count_start_per_round(dialog)
+    aligned_rounds = get_aligned_rounds(dialog)
+    return start_token_per_round, end_ix, aligned_rounds

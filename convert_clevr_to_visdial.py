@@ -4,7 +4,7 @@ import tqdm
 import transformers
 import random
 
-from coreference import extract_clusters
+from coreference import group_nps_pipline, prepare_for_indexing, index_clusters
 
 nlp = spacy.load("en_core_web_sm")
 tokenizer = transformers.BertTokenizer.from_pretrained("bert-base-uncased")
@@ -47,17 +47,19 @@ def main(clevr_path, save_path, mix_dialogs=3):
                     'answer_options': list(range(100)),
                     "gt_index": answer_ix,
                 })
-            clusters = extract_clusters(dialog)
+            groupped_nps = group_nps_pipline(dialog)
+            start_token_per_round, end_ix, aligned_rounds = prepare_for_indexing(dialog)
             if mix_dialogs > 0:
-                ixs = random.choices(range(len(new_rounds) - 1), k=mix_dialogs)
+                ixs = random.choices(range(1,len(new_rounds) - 1), k=mix_dialogs)
                 ixs += [len(new_rounds)]
                 new_dialogs = [
                     {
                         'image_id': image_ix,
                         'dialog': new_rounds[:i],
                         'caption': caption,
-                        'clusters': clusters,
-                        'round_id': i,
+                        'clusters': index_clusters(groupped_nps, start_token_per_round, end_ix, aligned_rounds,
+                                                   last_round=i),
+                        'round_id': i - 1,
                     }
                     for i in ixs
                 ]
@@ -67,8 +69,8 @@ def main(clevr_path, save_path, mix_dialogs=3):
                     'image_id': image_ix,
                     'dialog': new_rounds,
                     'caption': caption,
-                    'clusters': clusters,
-                    'round_id': len(new_rounds),
+                    'clusters': index_clusters(groupped_nps, start_token_per_round, end_ix, aligned_rounds),
+                    'round_id': len(new_rounds) - 1,
                 }
                 clevr_dialogs.append(new_dialog)
     clevr_visdial = {
@@ -84,6 +86,6 @@ def main(clevr_path, save_path, mix_dialogs=3):
 
 
 if __name__ == '__main__':
-    main(clevr_path='clevr/CLEVR_VD_VAL.json',
-         save_path='clevr/CLEVR_VD_VAL_VISDIAL_1000_pictures_mixed_dialog_length.json',
-         mix_dialogs=3)
+    main(clevr_path='clevr/CLEVR_VD_VAL.json.json',
+         save_path='clevr/CLEVR_VD_VAL_VISDIAL_1000_pictures_full_dialogs.json',
+         mix_dialogs=-1)
