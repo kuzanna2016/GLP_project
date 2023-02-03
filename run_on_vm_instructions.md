@@ -104,7 +104,7 @@ wget https://s3.amazonaws.com/visdial-bert/data/visdial_image_feats.lmdb/lock.md
 ### [CLEVR-VD] Download visual vectors (around 10 min)
 ```bash
 gdown 1nqj2S6ErUDLEW3jZYYm84J_GaKcEWnl5 -O disk/data/visdial/
-unzip -q image_features_1000.lmdb.zip
+unzip -q disk/data/visdial/image_features_1000.lmdb.zip -d disk/data/visdial/
 ```
 ### [Visdial] Download visdial dialog splits
 ```bash
@@ -112,15 +112,11 @@ gdown https://drive.google.com/drive/folders/1w5L_i8h9h32dCCZpOJDsur4TIYLOtS8F -
 ```
 ### [CLEVR-VD] Download CLEVR-VD
 ```bash
-gdown 1XdqIyNNYkKt_l7_QLdaPs32iwCkHcM63 -O disk/data/clevr/
-gdown 1LiC_YXqPq0qfhEh_0KU2JX17rRNnhNwm -O disk/data/clevr/
+gdown 1GcKjhbcVWZHdiv-T4jh3wuMm7WAtI7J7 --folder -O disk/data/clevr
 ```
 ### Download configs
 ```
-scp -P 60121 clevr/config/conly.conf disi@ml-lab-2a8eaddc-f375-4ce9-914c-c69e61f6f4ec.westeurope.cloudapp.azure.com:~/VD-PCR/config/
-scp -P 60121 clevr/config/ensemble.conf disi@ml-lab-2a8eaddc-f375-4ce9-914c-c69e61f6f4ec.westeurope.cloudapp.azure.com:~/VD-PCR/config/
-scp -P 60121 clevr/config/joint.conf disi@ml-lab-2a8eaddc-f375-4ce9-914c-c69e61f6f4ec.westeurope.cloudapp.azure.com:~/VD-PCR/config/
-scp -P 60121 clevr/config/vonly.conf disi@ml-lab-2a8eaddc-f375-4ce9-914c-c69e61f6f4ec.westeurope.cloudapp.azure.com:~/VD-PCR/config/
+gdown https://drive.google.com/drive/folders/1bywQKMXw22lFRiC7Gy3iFcPijSu1Qcrx -O VD-PCR/config --folder
 ```
 
 ### Run Phase 1
@@ -129,16 +125,18 @@ cd VD-PCR
 GPU=0 python main.py --model joint/MB-JC --mode eval
 
 GPU=0 python main.py --model vonly/MB-JC_predict --mode predict
+python postprocessing/merge_predictions.py --mode phase1 --model MB-JC_predict
+
+GPU=0 python main.py --model conly/MB-JC_eval --mode eval
+
+# experiments:
+GPU=0 python main.py --model vonly/MB-JC_predict --mode predict
 GPU=0 python main.py --model conly/MB-JC_predict --mode predict
 GPU=0 python main.py --model conly/MB-JC_eval --mode eval
 GPU=0 python main.py --model conly/MB-JC_eval --mode predict
-GPU=0 python main.py --model vonly/MB-JC_predict --mode predict
-
-python postprocessing/merge_predictions.py --mode phase1 --model MB-JC_predict
 ```
 ### Phase 2
 ```bash
-python preprocessing/extract_relevant_history.py --include_cap --save_name crf_cap
 GPU=0 python main.py --model vonly/MB-JC-HP-crf_cap-test --mode predict
 python ensemble.py --exp convert --mode predict
 ```
@@ -148,7 +146,7 @@ python ensemble.py --exp convert --mode predict
 
 ### To copy file from server to local run
 ```bash
-scp -P 62068 disi@ml-lab-2a8eaddc-f375-4ce9-914c-c69e61f6f4ec.westeurope.cloudapp.azure.com:~/disk/CLEVR_v1.0/images/val/CLEVR_val_000000.png /home/kuzya/Desktop/uni/GLP
+scp -P 60121 disi@ml-lab-2a8eaddc-f375-4ce9-914c-c69e61f6f4ec.westeurope.cloudapp.azure.com:~/VD-PCR/logs/conly/MB-JC_eval/coref_output/conly_MB-JC_eval_coref_output.zip /home/kuzya/Desktop/uni/GLP/VD_PCR_predictions/clevr
 scp -P 60121 disi@ml-lab-2a8eaddc-f375-4ce9-914c-c69e61f6f4ec.westeurope.cloudapp.azure.com:~/2801session.txt /home/kuzya/Desktop/uni/GLP/
 ```
 
