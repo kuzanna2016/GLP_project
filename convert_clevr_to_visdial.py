@@ -9,6 +9,7 @@ from coreference import group_nps_pipline, prepare_for_indexing, index_clusters,
 nlp = spacy.load("en_core_web_sm")
 tokenizer = transformers.BertTokenizer.from_pretrained("bert-base-uncased")
 
+
 def connect_pronoun_info(nps, pronouns, clusters):
     pronoun_info = []
     for pronoun in pronouns:
@@ -33,7 +34,7 @@ def connect_pronoun_info(nps, pronouns, clusters):
     return pronoun_info
 
 
-def main(clevr_path, save_path, mix_dialogs=3, n_answers=100):
+def main(clevr_path, save_path, mix_dialog_length=False, n_answers=100, n_dialogs_per_image=1):
     clevr = json.load(open(clevr_path))
     images = json.load(open('clevr/images.json'))
     images = [i[2:-1] for i in images]
@@ -45,7 +46,9 @@ def main(clevr_path, save_path, mix_dialogs=3, n_answers=100):
         image_ix = 'CLEVR_val_' + '0' * (6 - len(image_ix)) + image_ix
         if image_ix not in images:
             continue
-        for dialog in dialog_set['dialogs']:
+        dialogs = random.sample(dialog_set['dialogs'], k=n_dialogs_per_image) if n_dialogs_per_image < len(
+            dialog_set['dialogs']) else dialog_set['dialogs']
+        for dialog in dialogs:
             new_rounds = []
             dialog_tokenized = []
             caption = tokenizer.tokenize(dialog['caption'])
@@ -72,27 +75,24 @@ def main(clevr_path, save_path, mix_dialogs=3, n_answers=100):
                 })
             groupped_nps, round_nps, round_pronouns = group_nps_pipline(dialog)
             start_token_per_round, end_ix, aligned_rounds = prepare_for_indexing(dialog)
-            if mix_dialogs > 0:
-                ixs = random.sample(range(1,len(new_rounds) - 1), k=mix_dialogs)
-                ixs += [len(new_rounds)]
-                new_dialogs = []
-                for i in ixs:
-                    nps, pronouns = index_nps_and_pronouns(round_nps, round_pronouns, start_token_per_round, end_ix,
-                                                           aligned_rounds, last_round=i)
-                    clusters = index_clusters(groupped_nps, start_token_per_round, end_ix, aligned_rounds, last_round=i)
-                    pronoun_info = connect_pronoun_info(nps, pronouns, clusters)
-                    new_dialogs.append({
-                        'image_id': image_ix,
-                        'dialog': new_rounds[:i],
-                        'caption': caption,
-                        'clusters': clusters,
-                        'round_id': i,
-                        'pronoun_info': pronoun_info
-                    })
-                clevr_dialogs.extend(new_dialogs)
+            if mix_dialog_length:
+                i = random.choice(range(1, len(new_rounds)))
+                nps, pronouns = index_nps_and_pronouns(round_nps, round_pronouns, start_token_per_round, end_ix,
+                                                       aligned_rounds, last_round=i)
+                clusters = index_clusters(groupped_nps, start_token_per_round, end_ix, aligned_rounds, last_round=i)
+                pronoun_info = connect_pronoun_info(nps, pronouns, clusters)
+                clevr_dialogs.append({
+                    'image_id': image_ix,
+                    'dialog': new_rounds[:i],
+                    'caption': caption,
+                    'clusters': clusters,
+                    'round_id': i,
+                    'pronoun_info': pronoun_info
+                })
             else:
-                nps, pronouns = index_nps_and_pronouns(round_nps, round_pronouns, start_token_per_round, end_ix, aligned_rounds)
-                clusters =  index_clusters(groupped_nps, start_token_per_round, end_ix, aligned_rounds)
+                nps, pronouns = index_nps_and_pronouns(round_nps, round_pronouns, start_token_per_round, end_ix,
+                                                       aligned_rounds)
+                clusters = index_clusters(groupped_nps, start_token_per_round, end_ix, aligned_rounds)
                 pronoun_info = connect_pronoun_info(nps, pronouns, clusters)
                 new_dialog = {
                     'image_id': image_ix,
@@ -103,7 +103,8 @@ def main(clevr_path, save_path, mix_dialogs=3, n_answers=100):
                     'pronoun_info': pronoun_info,
                 }
                 clevr_dialogs.append(new_dialog)
-    clevr_answers += ['unk']*(n_answers - len(clevr_answers))
+    while len(clevr_answers) < n_answers:
+        clevr_answers += clevr_answers[:n_answers - len(clevr_answers)]
     clevr_visdial = {
         'data': {
             'dialogs': clevr_dialogs,
@@ -118,5 +119,5 @@ def main(clevr_path, save_path, mix_dialogs=3, n_answers=100):
 
 if __name__ == '__main__':
     main(clevr_path='clevr/CLEVR_VD_VAL.json',
-         save_path='clevr/CLEVR_VD_VAL_VISDIAL_1000_pictures_mix_dialogs.json',
-         mix_dialogs=2)
+         save_path='clevr/CLEVR_VD_VAL_VISDIAL_1000_pictures_full_dialogs.json',
+         mix_dialog_length=False)
