@@ -33,7 +33,7 @@ def connect_pronoun_info(nps, pronouns, clusters):
     return pronoun_info
 
 
-def main(clevr_path, save_path, mix_dialogs=3):
+def main(clevr_path, save_path, mix_dialogs=3, n_answers=100):
     clevr = json.load(open(clevr_path))
     images = json.load(open('clevr/images.json'))
     images = [i[2:-1] for i in images]
@@ -103,6 +103,7 @@ def main(clevr_path, save_path, mix_dialogs=3):
                     'pronoun_info': pronoun_info,
                 }
                 clevr_dialogs.append(new_dialog)
+    clevr_answers += ['unk']*(n_answers - len(clevr_answers))
     clevr_visdial = {
         'data': {
             'dialogs': clevr_dialogs,
