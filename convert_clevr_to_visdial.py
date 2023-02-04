@@ -16,7 +16,6 @@ parser.add_argument('--clevr_path', type=str, default='clevr/CLEVR_VD_VAL.json')
 parser.add_argument('--save_path', type=str, default='clevr/CLEVR_VD_VAL_VISDIAL_1000_pictures_full_dialogs.json')
 parser.add_argument('--dense_save_path', type=str, default='clevr/CLEVR_VD_VAL_VISDIAL_1000_pictures_full_dialogs_dense.json')
 parser.add_argument('--mix_dialog_length', action='store_true')
-parser.add_argument('--n_answers', type=int, default=100)
 parser.add_argument('--n_dialogs_per_image', type=int, default=1)
 
 def connect_pronoun_info(nps, pronouns, clusters):
@@ -50,11 +49,15 @@ def main(args):
     clevr_questions = []
     clevr_answers = []
     clevr_dialogs = []
+    seen = []
     for dialog_set in tqdm.tqdm(clevr):
         image_ix = str(dialog_set['image_index'])
         image_ix = 'CLEVR_val_' + '0' * (6 - len(image_ix)) + image_ix
         if image_ix not in images:
             continue
+        if image_ix in seen:
+            continue
+        seen.append(image_ix)
         dialogs = random.sample(dialog_set['dialogs'], k=args.n_dialogs_per_image) if args.n_dialogs_per_image < len(
             dialog_set['dialogs']) else dialog_set['dialogs']
         for dialog in dialogs:
@@ -79,7 +82,7 @@ def main(args):
                 new_rounds.append({
                     'answer': answer_ix,
                     'question': question_ix,
-                    'answer_options': list(range(100)),
+                    'answer_options': list(range(29)),
                     "gt_index": answer_ix,
                 })
             groupped_nps, round_nps, round_pronouns = group_nps_pipline(dialog)
@@ -112,8 +115,6 @@ def main(args):
                     'pronoun_info': pronoun_info,
                 }
                 clevr_dialogs.append(new_dialog)
-    while len(clevr_answers) < args.n_answers:
-        clevr_answers += clevr_answers[:args.n_answers - len(clevr_answers)]
     clevr_visdial = {
         'data': {
             'dialogs': clevr_dialogs,
