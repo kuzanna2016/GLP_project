@@ -70,12 +70,29 @@ def pretty_print_coref_sentence(tokens, clusters):
     return tokens
 
 
-def examine_visdial(predictions, dialogs):
+def examine_visdial(predictions, dialogs, n_examples):
     evaluator = SparseGTMetrics()
     target_ranks = [d['dialog'][-1]['gt_index'] for d in dialogs['data']['dialogs']]
     predicted_ranks = [p['ranks'] for p in predictions]
     evaluator.observe(predicted_ranks, target_ranks)
     metrics = evaluator.retrieve(reset=False)
+    ixs = random.sample(range(len(predictions)), k=n_examples)
+    for i, ix in enumerate(ixs):
+        dialog = dialogs['data']['dialogs'][ix]
+        print(i + 1, dialog['image_id'])
+        print('C:', dialog['caption'])
+        for r in dialog['dialog']:
+            q = dialogs['data']['questions'][r['question']]
+            a = dialogs['data']['answers'][r['answer']]
+            print('Q:', q)
+            print('A:',a)
+        pred_ranks = [predicted_ranks[ix].index(i) for i in range(1,6)]
+        pred_answers = [dialogs['data']['answers'][p] for p in pred_ranks]
+        print('Top-5 predicted:', '/'.join([p if p != a else f'__{p}__' for p in pred_answers]))
+        print('=' * 60)
+
+
+
     return metrics
 
 
@@ -87,7 +104,7 @@ def main(prediction_fp, target_fp=None, vd=False, n_examples=10, save_fp=None):
     else:
         predictions = json.load(open(prediction_fp))
         dialogs = json.load(open(target_fp))
-        metrics = examine_visdial(predictions, dialogs)
+        metrics = examine_visdial(predictions, dialogs, n_examples)
         print(metrics)
 
 
@@ -99,9 +116,8 @@ if __name__ == '__main__':
     #     save_fp='../VD_PCR_predictions/clevr/conly_MB-JC_eval_coref_output_best.json'
     # )
     main(
-        prediction_fp='../VD_PCR_predictions/clevr/vonly_MB-JC_predict_visdial_prediction_0402.json',
+        prediction_fp='../VD_PCR_predictions/clevr/vonly_MB-JC-HP-crf_cap-test_predict.json',
         target_fp='clevr/CLEVR_VD_VAL_VISDIAL_1000_pictures_mix_dialogs.json',
-        vd=True,
         n_examples=50,
-        save_fp='../VD_PCR_predictions/clevr/conly_MB-JC_eval_coref_output_best.json'
+        vd=True
     )
