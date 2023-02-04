@@ -115,7 +115,7 @@ gdown https://drive.google.com/drive/folders/1w5L_i8h9h32dCCZpOJDsur4TIYLOtS8F -
 gdown 1GcKjhbcVWZHdiv-T4jh3wuMm7WAtI7J7 --folder -O disk/data/clevr
 ```
 ### Download configs
-```
+```bash
 gdown https://drive.google.com/drive/folders/1bywQKMXw22lFRiC7Gy3iFcPijSu1Qcrx -O VD-PCR/config --folder
 ```
 
@@ -153,4 +153,15 @@ scp -P 60121 disi@ml-lab-2a8eaddc-f375-4ce9-914c-c69e61f6f4ec.westeurope.cloudap
 ### to copy file from local to server run
 ```bash
 scp -P 60121 clevr/CLEVR_VD_VAL_VISDIAL_1_dialog_per_1000_pictures.json disi@ml-lab-2a8eaddc-f375-4ce9-914c-c69e61f6f4ec.westeurope.cloudapp.azure.com:~/disk/datasets/clevr
+```
+
+### to zip the predictions
+```bash
+zip -jqr VD-PCR/logs/conly/MB-JC_eval/conly_MB-JC_eval_coref_output_best.zip VD-PCR/logs/conly/MB-JC_eval/coref_output_best/test
+```
+
+### to save colored output from the file
+```bash
+script -q -c "python3 examine_predictions.py" colored_output.txt
+cat colored_output.txt | aha > colored_output.htm
 ```
