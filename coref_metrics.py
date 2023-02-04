@@ -2,10 +2,45 @@ import numpy as np
 from collections import Counter
 from scipy.optimize import linear_sum_assignment as linear_assignment
 
+
+def update_coref_evaluator(output, coref_evaluator, pr_coref_evaluator):
+    gold_clusters = output['gold_clusters']
+    predicted_clusters = output['predicted_clusters']
+    pronoun_info = output['pronoun_info']
+    sentences = output['sentences']
+
+    gold_clusters = [
+        tuple(tuple(span) for span in cluster)
+        for cluster in gold_clusters
+    ]
+    span_to_gold_cluster = {
+        span: cluster
+        for cluster in gold_clusters
+        for span in cluster
+    }
+    predicted_clusters = [
+        tuple(tuple(span) for span in cluster)
+        for cluster in predicted_clusters
+    ]
+    span_to_predicted_cluster = {
+        span: cluster
+        for cluster in predicted_clusters
+        for span in cluster
+    }
+    coref_evaluator.update(
+        predicted=predicted_clusters,
+        gold=gold_clusters,
+        mention_to_predicted=span_to_predicted_cluster,
+        mention_to_gold=span_to_gold_cluster
+    )
+    pr_coref_evaluator.update(predicted_clusters, pronoun_info, sentences)
+
+
 def f1(p_num, p_den, r_num, r_den, beta=1):
     p = 0 if p_den == 0 else p_num / float(p_den)
     r = 0 if r_den == 0 else r_num / float(r_den)
     return 0 if p + r == 0 else (1 + beta * beta) * p * r / (beta * beta * p + r)
+
 
 class CorefEvaluator(object):
     def __init__(self):
@@ -14,6 +49,7 @@ class CorefEvaluator(object):
     def update(self, predicted, gold, mention_to_predicted, mention_to_gold):
         for e in self.evaluators:
             e.update(predicted, gold, mention_to_predicted, mention_to_gold)
+
 
     def get_f1(self):
         return sum(e.get_f1() for e in self.evaluators) / len(self.evaluators)
@@ -26,6 +62,7 @@ class CorefEvaluator(object):
 
     def get_prf(self):
         return self.get_precision(), self.get_recall(), self.get_f1()
+
 
 class Evaluator(object):
     def __init__(self, metric, beta=1):
@@ -159,14 +196,15 @@ def verify_correct_NP_match(predicted_NP, gold_NPs, model, matched_gold_ids):
             if tmp_gold_NP[0] >= predicted_NP[0] and tmp_gold_NP[1] <= predicted_NP[1]:
                 return gold_id
     return None
-    
+
 
 class PrCorefEvaluator(object):
     def __init__(self):
         self.all_coreference = 0
         self.predict_coreference = 0
         self.correct_predict_coreference = 0
-        self.pronoun_list = ['she', 'her', 'he', 'him', 'them', 'they', 'She', 'Her', 'He', 'Him', 'Them', 'They', 'it', 'It', 'his', 'hers', 'its', 'their', 'theirs', 'His', 'Hers', 'Its', 'Their', 'Theirs']
+        self.pronoun_list = ['she', 'her', 'he', 'him', 'them', 'they', 'She', 'Her', 'He', 'Him', 'Them', 'They', 'it',
+                             'It', 'his', 'hers', 'its', 'their', 'theirs', 'His', 'Hers', 'Its', 'Their', 'Theirs']
 
     def get_prf(self):
         p = 0 if self.predict_coreference == 0 else self.correct_predict_coreference / self.predict_coreference
@@ -174,7 +212,6 @@ class PrCorefEvaluator(object):
         f1 = 0 if p + r == 0 else 2 * p * r / (p + r)
 
         return p, r, f1
-
 
     def update(self, predicted_clusters, pronoun_info, sentences):
         predicted_clusters = [tuple(pc) for pc in predicted_clusters]
@@ -199,18 +236,20 @@ class PrCorefEvaluator(object):
                         tmp_mention_span = (
                             mention_start_index,
                             mention[1])
-                        matched_np_id = verify_correct_NP_match(tmp_mention_span, tmp_candidate_NPs, 'cover', matched_cdd_np_ids)
+                        matched_np_id = verify_correct_NP_match(tmp_mention_span, tmp_candidate_NPs, 'cover',
+                                                                matched_cdd_np_ids)
                         if matched_np_id is not None:
                             # exclude such scenario: predict 'its' and overlap with candidate 'its eyes'
                             # predict +1 but correct +0
-                            if tmp_mention_span[0] < len(sentences) and\
-                                tmp_mention_span[0] == tmp_mention_span[1] and\
-                                sentences[tmp_mention_span[0]] in self.pronoun_list and\
-                                len(tmp_candidate_NPs[matched_np_id]) > 1:
+                            if tmp_mention_span[0] < len(sentences) and \
+                                    tmp_mention_span[0] == tmp_mention_span[1] and \
+                                    sentences[tmp_mention_span[0]] in self.pronoun_list and \
+                                    len(tmp_candidate_NPs[matched_np_id]) > 1:
                                 continue
                             matched_cdd_np_ids.append(matched_np_id)
                             self.predict_coreference += 1
-                            matched_np_id = verify_correct_NP_match(tmp_mention_span, tmp_correct_candidate_NPs, 'cover', matched_crr_np_ids)
+                            matched_np_id = verify_correct_NP_match(tmp_mention_span, tmp_correct_candidate_NPs,
+                                                                    'cover', matched_crr_np_ids)
                             if matched_np_id is not None:
                                 matched_crr_np_ids.append(matched_np_id)
                                 self.correct_predict_coreference += 1
@@ -221,7 +260,7 @@ class PrCorefEvaluator(object):
 
 def gather_round_metrics(coref_evaluator):
     coref_precision, coref_recall, coref_f1 = list(zip(*[c.get_prf()
-                                                        for c in coref_evaluator]))
+                                                         for c in coref_evaluator]))
     coref_precision_rnds = np.mean(coref_precision)
     coref_recall_rnds = np.mean(coref_recall)
     coref_f1_rnds = np.mean(coref_f1)
