@@ -3,12 +3,21 @@ import spacy
 import tqdm
 import transformers
 import random
+import argparse
 
 from coreference import group_nps_pipline, prepare_for_indexing, index_clusters, index_nps_and_pronouns
+from make_dense_annotations import main as make_dense
 
 nlp = spacy.load("en_core_web_sm")
 tokenizer = transformers.BertTokenizer.from_pretrained("bert-base-uncased")
 
+parser = argparse.ArgumentParser(description='Main script for visdial-coref')
+parser.add_argument('--clevr_path', type=str, default='clevr/CLEVR_VD_VAL.json')
+parser.add_argument('--save_path', type=str, default='clevr/CLEVR_VD_VAL_VISDIAL_1000_pictures_full_dialogs.json')
+parser.add_argument('--dense_save_path', type=str, default='clevr/CLEVR_VD_VAL_VISDIAL_1000_pictures_full_dialogs_dense.json')
+parser.add_argument('--mix_dialog_length', action='store_true')
+parser.add_argument('--n_answers', type=int, default=100)
+parser.add_argument('--n_dialogs_per_image', type=int, default=1)
 
 def connect_pronoun_info(nps, pronouns, clusters):
     pronoun_info = []
@@ -34,8 +43,8 @@ def connect_pronoun_info(nps, pronouns, clusters):
     return pronoun_info
 
 
-def main(clevr_path, save_path, mix_dialog_length=False, n_answers=100, n_dialogs_per_image=1):
-    clevr = json.load(open(clevr_path))
+def main(args):
+    clevr = json.load(open(args.clevr_path))
     images = json.load(open('clevr/images.json'))
     images = [i[2:-1] for i in images]
     clevr_questions = []
@@ -46,7 +55,7 @@ def main(clevr_path, save_path, mix_dialog_length=False, n_answers=100, n_dialog
         image_ix = 'CLEVR_val_' + '0' * (6 - len(image_ix)) + image_ix
         if image_ix not in images:
             continue
-        dialogs = random.sample(dialog_set['dialogs'], k=n_dialogs_per_image) if n_dialogs_per_image < len(
+        dialogs = random.sample(dialog_set['dialogs'], k=args.n_dialogs_per_image) if args.n_dialogs_per_image < len(
             dialog_set['dialogs']) else dialog_set['dialogs']
         for dialog in dialogs:
             new_rounds = []
@@ -75,7 +84,7 @@ def main(clevr_path, save_path, mix_dialog_length=False, n_answers=100, n_dialog
                 })
             groupped_nps, round_nps, round_pronouns = group_nps_pipline(dialog)
             start_token_per_round, end_ix, aligned_rounds = prepare_for_indexing(dialog)
-            if mix_dialog_length:
+            if args.mix_dialog_length:
                 i = random.choice(range(1, len(new_rounds)))
                 nps, pronouns = index_nps_and_pronouns(round_nps, round_pronouns, start_token_per_round, end_ix,
                                                        aligned_rounds, last_round=i)
@@ -103,8 +112,8 @@ def main(clevr_path, save_path, mix_dialog_length=False, n_answers=100, n_dialog
                     'pronoun_info': pronoun_info,
                 }
                 clevr_dialogs.append(new_dialog)
-    while len(clevr_answers) < n_answers:
-        clevr_answers += clevr_answers[:n_answers - len(clevr_answers)]
+    while len(clevr_answers) < args.n_answers:
+        clevr_answers += clevr_answers[:args.n_answers - len(clevr_answers)]
     clevr_visdial = {
         'data': {
             'dialogs': clevr_dialogs,
@@ -114,10 +123,11 @@ def main(clevr_path, save_path, mix_dialog_length=False, n_answers=100, n_dialog
         'split': 'test',
         'version': '1.2'
     }
-    json.dump(clevr_visdial, open(save_path, 'w'))
+    json.dump(clevr_visdial, open(args.save_path, 'w'))
 
 
 if __name__ == '__main__':
-    main(clevr_path='clevr/CLEVR_VD_VAL.json',
-         save_path='clevr/CLEVR_VD_VAL_VISDIAL_1000_pictures_full_dialogs.json',
-         mix_dialog_length=False)
+    args = parser.parse_args()
+    main(args)
+    make_dense(args.save_path, args.dense_save_path)
+
