@@ -4,7 +4,6 @@ import transformers
 import tokenizations
 import jsonlines
 import argparse
-from coreference import _get_difference, count_start_per_round
 
 tokenizer_un = transformers.BertTokenizer.from_pretrained("bert-base-uncased")
 tokenizer = transformers.BertTokenizer.from_pretrained("bert-base-cased")
@@ -63,6 +62,7 @@ def main(args):
     ontonotes = []
     for dialog in tqdm.tqdm(clevr['data']['dialogs']):
         data = {
+            'image_id': dialog['image_id'],
             'doc_key': "bc",
             'sentences': [["[CLS]"]],
             'speakers': [["[SPL]"]],
@@ -96,6 +96,20 @@ def main(args):
             ]
             for cluster in dialog['clusters']
         ]
+        for pr_info in dialog['pronoun_info']:
+            pr_info['current_pronoun'] = [
+                min(uncased2cased[pr_info['current_pronoun'][0]]),
+                max(uncased2cased[pr_info['current_pronoun'][1]])
+            ]
+            pr_info['correct_NPs'] = [
+                [min(uncased2cased[np[0]]), max(uncased2cased[np[1]])]
+                for np in pr_info['correct_NPs']
+            ]
+            pr_info['candidate_NPs'] = [
+                [min(uncased2cased[np[0]]), max(uncased2cased[np[1]])]
+                for np in pr_info['candidate_NPs']
+            ]
+        data['pronoun_info'] = dialog['pronoun_info']
         ontonotes.append(data)
     with jsonlines.open(args.save_path, mode='w') as writer:
         for data in ontonotes:
