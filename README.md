@@ -20,6 +20,7 @@ it will also print differences in the prediction and target clusters.
 ## VD-PCR model
 [run_on_vm_instructions.md](run_on_vm_instructions.md) contains instruction on how to prepare the environment,
 extract image features from ViLBERT and run VD-PCR on our dataset. 
+Updated configs are in [config](config).
 
 ## Predictions
 Performance evaluation on coreference resolution and visual dialog can be done with [examine_predictions.py](examine_predictions.py).
