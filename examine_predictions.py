@@ -3,6 +3,7 @@ import random
 import os
 import colorama
 import jsonlines
+import matplotlib.pyplot as plt
 
 from coref_metrics import CorefEvaluator, PrCorefEvaluator, update_coref_evaluator
 from visdial_metrics import SparseGTMetrics
@@ -106,7 +107,7 @@ def examine_visdial(predictions, dialogs, n_examples):
     evaluator = SparseGTMetrics()
     target_ranks = [d['dialog'][-1]['gt_index'] for d in dialogs['data']['dialogs']]
     predicted_ranks = [p['ranks'] for p in predictions]
-    evaluator.observe(predicted_ranks, target_ranks)
+    evaluator.observe(predicted_ranks, target_ranks, rounds=[p['round_id'] for p in predictions])
     metrics = evaluator.retrieve(reset=False)
     ixs = random.sample(range(len(predictions)), k=n_examples)
     for i, ix in enumerate(ixs):
@@ -137,6 +138,12 @@ def main(prediction_fp, target_fp=None, vd=False, n_examples=10, save_fp=None, i
         predictions = json.load(open(prediction_fp))
         dialogs = json.load(open(target_fp))
         metrics = examine_visdial(predictions, dialogs, n_examples)
+        for r in [1,5,10]:
+            rounds = {int(k[-1]):v.item() for k, v in metrics.items() if 'round' in k and f'r_{r}' in k}
+            rounds = sorted(rounds.items())
+            plt.plot(*zip(*rounds))
+            plt.title(f'R@{r} for rounds')
+            plt.show()
         print(metrics)
 
 
@@ -147,14 +154,14 @@ if __name__ == '__main__':
     #     n_examples=50,
     #     save_fp='../VD_PCR_predictions/clevr/conly_MB-JC_eval_coref_output_best.json'
     # )
-    # main(
-    #     prediction_fp='../VD_PCR_predictions/clevr/vonly_MB-JC-HP-crf_cap-test_predict.json',
-    #     target_fp='clevr/CLEVR_VD_VAL_VISDIAL_1000_pictures_mix_dialogs.json',
-    #     n_examples=50,
-    #     vd=True
-    # )
     main(
-        prediction_fp='clevr/CLEVR_VD_VAL_VISDIAL_1000_pictures_full_dialogs_spanbert_prediction.jsonlines',
+        prediction_fp='../VD_PCR_predictions/clevr/vonly_MB-JC-HP-crf_cap-test_predict.json',
+        target_fp='clevr/CLEVR_VD_VAL_VISDIAL_1000_pictures_mix_dialogs.json',
         n_examples=50,
-        isontonotes=True,
+        vd=True
     )
+    # main(
+    #     prediction_fp='clevr/CLEVR_VD_VAL_VISDIAL_1000_pictures_full_dialogs_spanbert_prediction.jsonlines',
+    #     n_examples=50,
+    #     isontonotes=True,
+    # )

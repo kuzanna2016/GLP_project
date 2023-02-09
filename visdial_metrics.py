@@ -30,7 +30,7 @@ class SparseGTMetrics(object):
         self.num_rounds = None
 
     def observe(
-            self, predicted_ranks: List[List[float]], target_ranks: List[int]
+            self, predicted_ranks: List[List[float]], target_ranks: List[int], rounds
     ):
         # shape: (batch_size, num_rounds, num_options)
         predicted_ranks = np.asarray(predicted_ranks)
@@ -43,8 +43,13 @@ class SparseGTMetrics(object):
             np.arange(batch_size * num_rounds), np.asarray(target_ranks)
         ]
         self._rank_list.extend(list(predicted_gt_ranks))
-
-        predicted_gt_ranks_rnd = predicted_gt_ranks.reshape(batch_size, num_rounds)
+        rounds = np.asarray(rounds)
+        num_rounds = max(rounds)
+        rounds -= 1
+        predicted_gt_ranks_rnd = np.empty((batch_size, num_rounds))
+        predicted_gt_ranks_rnd[:] = np.nan
+        predicted_gt_ranks_rnd[np.arange(batch_size), rounds] = predicted_gt_ranks
+        # predicted_gt_ranks_rnd = predicted_gt_ranks.reshape(batch_size, num_rounds)
         #  predicted gt ranks
         self._rank_list_rnd.append(predicted_gt_ranks_rnd)
 
@@ -58,7 +63,7 @@ class SparseGTMetrics(object):
                 "r@5": np.mean((__rank_list <= 5)),
                 "r@10": np.mean((__rank_list <= 10)),
                 "mean": np.mean(__rank_list),
-                "mrr": np.mean(np.reciprocal(__rank_list))
+                # "mrr": np.mean(np.reciprocal(__rank_list))
             }
             # add round metrics
             _rank_list_rnd = np.concatenate(self._rank_list_rnd)
@@ -66,15 +71,15 @@ class SparseGTMetrics(object):
             r_1_rnd = np.mean(_rank_list_rnd <= 1, axis=0)
             r_5_rnd = np.mean(_rank_list_rnd <= 5, axis=0)
             r_10_rnd = np.mean(_rank_list_rnd <= 10, axis=0)
-            mean_rnd = np.mean(_rank_list_rnd, axis=0)
-            mrr_rnd = np.mean(np.reciprocal(_rank_list_rnd), axis=0)
+            mean_rnd = np.nanmean(_rank_list_rnd, axis=0)
+            mrr_rnd = np.nanmean(np.reciprocal(_rank_list_rnd), axis=0)
 
-            for rnd in range(1, self.num_rounds + 1):
+            for rnd in range(1, r_1_rnd.shape[0] + 1):
                 metrics["r_1" + "_round_" + str(rnd)] = r_1_rnd[rnd-1]
                 metrics["r_5" + "_round_" + str(rnd)] = r_5_rnd[rnd-1]
                 metrics["r_10" + "_round_" + str(rnd)] = r_10_rnd[rnd-1]
                 metrics["mean" + "_round_" + str(rnd)] = mean_rnd[rnd-1]
-                metrics["mrr" + "_round_" + str(rnd)] = mrr_rnd[rnd-1]
+                # metrics["mrr" + "_round_" + str(rnd)] = mrr_rnd[rnd-1]
         else:
             metrics = {}
 
